@@ -1,0 +1,246 @@
+{{!< layout}} <header class="aui-page-header">
+    <div class="aui-page-header-inner">
+        <div class="aui-page-header-main intro-header">
+            <h2>My Little app - Collaboratory Network(Dev)</h2>
+        </div>
+    </div>
+
+    <script src="https://cdn.anychart.com/releases/8.11.1/js/anychart-core.min.js"></script>
+    <script src="https://cdn.anychart.com/releases/8.11.1/js/anychart-graph.min.js"></script>
+
+    <script>
+        //DS for graph
+        var RelationShip = function (nodeA, nodeB, strength) {
+            this.nodeA = nodeA;
+            this.nodeB = nodeB;
+            this.strength = strength;
+        }
+
+        var addRelationShip = function (relationShips, newRelationShip) { //relationShips is a set of relationships
+            //get Both keys
+            key1 = newRelationShip.nodeA + "$$$" + newRelationShip.nodeB;
+            key2 = newRelationShip.nodeB + "$$$" + newRelationShip.nodeA;
+            strength = newRelationShip.strength;
+
+            if (relationShips[key1]) {
+                relationShips[key1] += strength;
+            } else if (relationShips[key2]) {
+                relationShips[key2] += strength;
+            } else {
+                relationShips[key1] = strength;
+            }
+
+            return relationShips;
+        }
+
+        async function processCommentOfIssue(issueId) {
+            var response = await AP.request({ url: '/rest/api/3/issue/' + issueId + '/comment', type: 'GET' });
+            var response_obj = JSON.parse(response.xhr.responseText).comments;
+
+            var authToMentioned = {};
+
+            //Comments itr
+            for (comment of response_obj) {
+                var author = comment.author.accountId;
+
+                let contents = comment.body.content[0].content;
+
+                var mentions = [];
+                for (content of contents) {
+                    if (content.type == "mention") {
+                        mentions.push(content.attrs.id);
+                    }
+                }
+
+                if (authToMentioned[author]) {
+                    authToMentioned[author] = authToMentioned[author].concat(mentions);
+                } else {
+                    authToMentioned[author] = mentions;
+                }
+            }
+
+            return authToMentioned;
+        }
+
+        //Get Issues from project
+        async function issuesFromProject() {
+
+            var projects = "{{projects}}".split(" ");
+            console.log(projects);
+
+            var relationShips = {};
+
+            var all_users = {};
+
+            for (project of projects) {
+                //Get all the users of a project
+                var response = await AP.request({ url: '/rest/api/3/user/assignable/multiProjectSearch?&projectKeys=' + project, type: 'GET' });
+                var response_obj = JSON.parse(response.xhr.responseText);
+
+                //Its through all the users
+                for (userObj of response_obj) {
+                    if (userObj.accountType == "atlassian") {
+                        user = {};
+                        accountId = userObj.accountId
+                        user["avatar"] = userObj.avatarUrls["24x24"];
+                        user["display_name"] = userObj.displayName;
+                        all_users[accountId] = user;
+                    }
+                }
+
+                //Get all the issues of a project
+                var response = await AP.request({ url: '/rest/api/3/search?jql=project=' + project, type: 'GET' });
+                var response_obj = JSON.parse(response.xhr.responseText);
+
+                //Itr through issues
+                for (issueObj of response_obj.issues) {
+                    fields = issueObj.fields;
+
+                    var assignee = issueObj.fields.assignee;
+                    var reporter = issueObj.fields.reporter;
+
+                    if (assignee != null) {
+                        relationShips = addRelationShip(relationShips, new RelationShip(assignee.accountId, reporter.accountId, 1));
+                    }
+
+
+                    //Comment process
+                    var comments = await processCommentOfIssue(issueObj.id);
+                    for (comment in comments) {
+                        var auth = comment;
+                        var mentions = comments[comment];
+
+                        for (mention of mentions) {
+                            relationShips = addRelationShip(relationShips, new RelationShip(auth, mention, 1));
+                        }
+                    }
+
+                    //console.log(JSON.stringify(comments));
+                }
+
+            }
+
+            console.log(all_users)
+
+            /*var table = document.getElementById("collab_split");
+
+            for (relation in relationShips) {
+                var nodes = relation.split("$$$");
+                console.log(nodes[0] + " -> " + nodes[1] + " = " + relationShips[relation]);
+
+                var newRow = table.tBodies[0].insertRow();
+
+                // Insert cells for the row
+                var cell1 = newRow.insertCell(0);
+                var cell2 = newRow.insertCell(1);
+                var cell3 = newRow.insertCell(2);
+
+                // Set the cell values
+                cell1.innerHTML = nodes[0];
+                cell2.innerHTML = nodes[1];
+                cell3.innerHTML = relationShips[relation];
+
+            }*/
+
+            return {"relationShips":relationShips,"users":all_users};
+
+        }
+
+        //Draw the collab network
+        var drawNetwork = function(userData,relationShips){
+            var nodeData = []
+            var edgeData = []
+            
+            //Nodes
+            for(user in userData){
+                var node = {};
+                var id = user;
+                var avatar = userData[user].avatar;
+                var display = userData[user].display_name;
+
+                node["id"] = id;
+                node["display"] = display;
+
+                //DP url implant
+                node["height"] = 50;
+                node["fill"] = {"src":avatar};
+
+                nodeData.push(node);
+            }
+
+            //Edges
+            for(relation in relationShips){
+                var edge = {};
+                var nodes = relation.split("$$$");
+                
+                edge["from"] = nodes[0];
+                edge["to"] = nodes[1];
+                edge["strength"] = parseInt(relationShips[relation]) ;
+                
+                var stroke = {};
+                stroke["color"] = "#000000";
+                stroke["thickness"] = edge["strength"];
+
+                edge["normal"] = {"stroke":stroke};
+
+                edgeData.push(edge);
+            }
+
+
+            //Draw the chart
+            var data = {"nodes":nodeData,"edges":edgeData}
+            console.log(JSON.stringify(data));
+
+            var chart = anychart.graph(data);
+            
+            // Label of the nodes
+            chart.nodes().labels().enabled(true);
+            chart.nodes().labels().format(function() {
+                return  "" + this.getData("display") + "";
+            });
+            chart.nodes().labels().fontSize(12);
+            chart.nodes().labels().fontWeight(600);
+
+
+            chart.container(document.getElementById("chart_container"));
+            chart.draw();
+        }
+
+        //Get the colab graph
+        var getDataForCollab = async function () {
+            var network_data = await issuesFromProject();
+            drawNetwork(network_data.users,network_data.relationShips);
+        }
+
+        getDataForCollab();
+
+    </script>
+
+
+    </header>
+
+    <div class="aui-page-panel main-panel">
+        <div class="aui-page-panel-inner">
+            <section class="aui-page-panel-item">
+                <div class="aui-group">
+                    <div class="aui-item">
+
+                        {{!-- <table id="collab_split" class="aui aui-table">
+                            <thead>
+                                <tr>
+                                    <th>Node A</th>
+                                    <th>Node B</th>
+                                    <th>Interaction</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            </tbody>
+                        </table> --}}
+
+                        <div id="chart_container" class="aui-item" style="height: 500px;"></div>
+
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>

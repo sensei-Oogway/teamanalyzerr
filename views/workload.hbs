@@ -1,0 +1,310 @@
+{{!< layout}} <header class="aui-page-header">
+    <div class="aui-page-header-inner">
+        <div class="aui-page-header-main intro-header">
+            <h2>My Little app - Workload(Dev)</h2>
+        </div>
+    </div>
+    <script src="https://connect-cdn.atl-paas.net/all.js"></script>
+    <script src="https://cdn.anychart.com/releases/8.11.1/js/anychart-base.min.js"></script>
+
+    <script src="https://cdn.anychart.com/releases/8.11.1/js/anychart-core.min.js"></script>
+    <script src="https://cdn.anychart.com/releases/8.11.1/js/anychart-heatmap.min.js"></script>
+
+    <script>
+        async function getDataForWorkload() {
+            //fetch Story point field
+            var story_field = "";
+            var response = await AP.request({ url: '/rest/api/3/field', type: 'GET' });
+            var response_obj = JSON.parse(response.xhr.responseText);
+
+            for (field of response_obj) {
+                if (field.name == "Story point estimate") {
+                    story_field = field.id;
+                    break;
+                }
+            }
+
+            var sprints_ob = JSON.parse(JSON.stringify({{{ sprints }}}));
+        var issues = [];
+
+        for (const value of sprints_ob) {
+            const sprint = value.id;
+
+            const response = await AP.request({ url: '/rest/agile/1.0/sprint/' + sprint + '/issue', type: 'GET' });
+            const response_obj = JSON.parse(response.xhr.responseText);
+
+            var issues_spr = [];
+            for (issue_ob of response_obj.issues) {
+                const issue = {};
+                issue['id'] = issue_ob.id;
+                issue['points'] = issue_ob.fields[story_field] == null ? 1 : issue_ob.fields[story_field];
+                issue['user'] = issue_ob.fields.assignee == null ? "unassigned" : issue_ob.fields.assignee;
+
+                issues_spr.push(issue);
+            }
+            issues.push({ "sprint": value, "issues": issues_spr });
+        }
+        return issues;
+        }
+
+        function cleanDataForHistogram(dataSet) {
+            //console.log(dataSet);
+            var userDetails = {};
+
+            //Split into current and older sprints
+            var active_sprint;
+            var finished_sprints = [];
+
+            for (data of dataSet) {
+                if (data.sprint.state == "closed") {
+                    finished_sprints.push(data);
+                }
+                else if (data.sprint.state == "active") {
+                    active_sprint = data;
+                }
+            }
+
+            //Process closed sprints
+            //Need Users vs Velocity
+            var userVsVelocity = {};
+            var teamsVelocity = 0.0;
+
+            for (sprint of finished_sprints) {
+                var totalDurationOfSprint = sprint.sprint.duration;
+                var userVsPts = {};
+
+                for (issue of sprint.issues) {
+                    var pt = issue.points;
+
+                    var user = issue.user;
+                    if (user.accountId != undefined) {
+                        user = user.accountId
+                    } else {
+                        user = "1"
+                    }
+
+                    //Push user details
+                    if (!userDetails[user]) {
+                        var userData = {};
+
+                        userData["name"] = issue.user.accountId ? issue.user.displayName : "unassigned";
+                        userDetails[user] = userData;
+                    }
+
+                    if (userVsPts[user]) {
+                        userVsPts[user] += pt;
+                    } else {
+                        userVsPts[user] = pt
+                    }
+                }
+
+                for (userId in userVsPts) {
+                    userVsPts[userId] = userVsPts[userId] / totalDurationOfSprint;
+                    if (userVsVelocity[userId]) {
+                        userVsVelocity[userId] += userVsPts[userId];
+                        userVsVelocity[userId] /= 2;
+                    } else {
+                        userVsVelocity[userId] = userVsPts[userId];
+                    }
+                }
+            }
+
+            //Team velocity
+            const velocities = Object.values(userVsVelocity);
+            teamsVelocity = velocities.reduce((sum, velocity) => sum + velocity, 0);
+            teamsVelocity /= Object.keys(userVsVelocity).length
+
+            //Process active sprint
+            //Need Users vs Workload
+            //console.log(JSON.stringify(active_sprints));
+
+            var sprintDuration = active_sprint.sprint.duration;
+
+            var userVsPts = {};
+            var userVsVelocity_cur = {};
+
+
+            for (issue of active_sprint.issues) {
+                var pt = issue.points;
+
+                var user = issue.user;
+                if (user.accountId != undefined) {
+                    user = user.accountId
+                } else {
+                    user = "1"
+                }
+
+                //Push user details
+                if (!userDetails[user]) {
+                    var userData = {};
+
+                    userData["name"] = issue.user.accountId ? issue.user.displayName : "unassigned";
+                    userDetails[user] = userData;
+                }
+
+                if (userVsPts[user]) {
+                    userVsPts[user] += pt;
+                } else {
+                    userVsPts[user] = pt
+                }
+            }
+
+            for (const userId in userVsPts) {
+                userVsVelocity_cur[userId] = userVsPts[userId] / sprintDuration;
+            }
+
+            //Workload calculation
+            var totalWorkload = 0;
+            for (const userId in userVsVelocity_cur) {
+                var previousVelocity = userVsVelocity[userId] ? userVsVelocity[userId] : teamsVelocity;
+                //console.log(previousVelocity)
+                var idealWorkload = previousVelocity * sprintDuration;
+                //console.log(idealWorkload)
+
+                var currentWorkload = (userVsPts[userId] / idealWorkload) * 100;
+                //console.log(currentWorkload)
+                userVsVelocity_cur[userId] = Math.ceil(currentWorkload);
+                totalWorkload += userVsVelocity_cur[userId];
+            }
+
+            console.log(userVsVelocity_cur)
+            return { "workload": userVsVelocity_cur, "userVsPts":userVsPts,"users": userDetails, "totalWorkload": totalWorkload };
+        }
+
+        function addRow(id, name, load) {
+            var table = document.getElementById(id);
+
+            var newRow = table.tBodies[0].insertRow();
+
+            // Insert cells for the row
+            var cell1 = newRow.insertCell(0);
+            var cell2 = newRow.insertCell(1);
+
+            // Set the cell values
+            cell1.innerHTML = name;
+            cell2.innerHTML = load;
+        }
+
+        async function displayWorkload() {
+            var issues = await getDataForWorkload();
+            var userVsWorkload = cleanDataForHistogram(issues);
+
+            var workload = userVsWorkload.workload;
+            var users = userVsWorkload.users;
+            var userVsPts = userVsWorkload.userVsPts;
+
+            var nameVsLoad = {};
+            var nameVsPt = {};
+            for (loads in workload) {
+                var name = users[loads].name;
+                var load = workload[loads];
+
+                nameVsLoad[name] = load;
+            }
+
+            for (userId in userVsPts) {
+                var name = users[userId].name;
+                var load = userVsPts[userId];
+
+                nameVsPt[name] = load;
+            }
+
+            console.log(nameVsLoad);
+
+            //var totalWorkload = userVsWorkload.totalWorkload;
+            for (user in nameVsLoad) {
+                //addRow("workload_capacity", user, nameVsLoad[user] + "%")
+            }
+
+            //Display chart
+            drawHeatMap(nameVsLoad);
+            drawWorkSplitChart(nameVsPt);
+        }
+
+        var drawWorkSplitChart = function (nameVsLoad) {
+            //Refactor data for chart
+            var load_data = [];
+
+            for (user in nameVsLoad) {
+                var user_data = {};
+                user_data["x"] = user;
+                user_data["value"] = nameVsLoad[user];
+                load_data.push(user_data);
+            }
+
+            chart = anychart.pie(load_data);
+            chart.container("split_chart_container");
+            chart.draw();
+        }
+
+        var drawHeatMap = function (nameVsLoad) {
+            //Refactor data for chart
+            var load_data = [];
+
+            var counter = 1;
+            for (user in nameVsLoad) {
+                var user_data = {};
+                user_data["x"] = counter;
+                user_data["y"] = "";
+                user_data["display"] = user;
+                user_data["heat"] = nameVsLoad[user];
+                load_data.push(user_data);
+
+                counter++;
+            }
+
+            chart = anychart.heatMap(load_data);
+
+            var customColorScale = anychart.scales.linearColor();
+            customColorScale.colors(["#7CFC00", "#ffce00", "#ff0000"]);
+
+            chart.labels().format("{%display}");
+
+            chart.colorScale(customColorScale);
+
+            chart.container("heat_chart_container");
+            chart.draw();
+        }
+
+        displayWorkload();
+
+    </script>
+
+    </header>
+
+    <div class="aui-page-panel main-panel">
+        <div class="aui-page-panel-inner">
+            <section class="aui-page-panel-item">
+                <div class="aui-group">
+                    <div class="aui-item">
+                        <h3>Heat Map - Workload based on capacity</h3>
+                        {{!-- <table id="workload_capacity" class="aui aui-table">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Workload</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            </tbody>
+                        </table> --}}
+                        <div id="heat_chart_container" style="height: 100px;width:500px;"></div>
+
+                        <h3>Workload distribution among team</h3>
+                        {{!-- <table id="workload_split" class="aui aui-table">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Split</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            </tbody>
+                        </table> --}}
+
+                        <div id="split_chart_container" class="aui-item" style="height: 500px;"></div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>

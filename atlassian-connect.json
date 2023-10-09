@@ -1,0 +1,52 @@
+{
+    "key": "my-app",
+    "name": "My app",
+    "description": "My very first app",
+    "baseUrl": "{{localBaseUrl}}",
+    "authentication": {
+        "type": "jwt"
+    },
+    "lifecycle": {
+        "installed": "/installed"
+    },
+    "scopes": [
+        "READ",
+        "ADMIN"
+    ],
+    "apiMigrations": {
+        "signed-install": true
+    },
+    "modules": {
+        "generalPages": [
+            {
+                "key": "hello-world-page-jira",
+                "location": "system.top.navigation.bar",
+                "name": {
+                    "value": "Collaborator network"
+                },
+                "url": "/get-collab",
+                "icon": {
+                    "width": 80,
+                    "height": 80,
+                    "url": "https://img.icons8.com/?size=96&id=Tsa8RI4Bpje1&format=png"
+                },
+                "conditions": [
+                    {
+                        "condition": "user_is_logged_in"
+                    }
+                ]
+            }
+        ],
+        "jiraProjectPages": [
+            {
+                "url": "/get-workload?projectId=${project.id}",
+                "iconUrl": "https://img.icons8.com/?size=512&id=103981&format=png",
+                "weight": 100,
+                "name": {
+                    "value": "Workload analyzer"
+                },
+                "key": "my-project-page"
+            }
+        ]
+    }
+}
