@@ -65,4 +65,52 @@ export default function routes(app, addon) {
 
         });
     });
+
+    app.get('/get-keywords', addon.authenticate(), (req, res) => {
+        var projectId = req.query.projectId;
+        var httpClient = addon.httpClient(req);
+        
+        //Get all issues in the project
+        httpClient.get('/rest/api/3/search?project=' + projectId + '&maxResults=200', function (err, response, body) {
+            var issues_obj = JSON.parse(body);
+
+            var forExtraction = {};
+
+            for(var issue of issues_obj.issues){
+                var details = {};
+
+                var id = issue.id;
+                var fields = issue.fields;
+
+                var assignee = fields.assignee;
+                var reporter = fields.reporter;
+
+                var summary = fields.summary;
+
+                forExtraction[id] = summary;
+            }
+
+            //console.log(forExtraction);
+
+            const payloadString = JSON.stringify(forExtraction);
+
+            httpClient.post({
+                url: 'http://127.0.0.1:8000/checkteam',
+                json: true,
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: payloadString
+              },
+              function(err, httpResponse, body) {
+                if (err) {
+                    res.render('hello-world.hbs')
+                }
+                console.log('Upload successful:', body);
+                res.render('hello-world.hbs',{dump:JSON.stringify(body)})
+              });
+
+        });
+
+    });
 }

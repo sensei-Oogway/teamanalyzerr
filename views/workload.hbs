@@ -10,6 +10,22 @@
     <script src="https://cdn.anychart.com/releases/8.11.1/js/anychart-core.min.js"></script>
     <script src="https://cdn.anychart.com/releases/8.11.1/js/anychart-heatmap.min.js"></script>
 
+    <style>
+        .cropped-image {
+            position: relative;
+            width: 252px; /* Set your desired width */
+            height: 33px; /* Set your desired height */
+            overflow: hidden;
+            padding-left: 10px;
+            margin-top: -28px;
+        }
+
+        .cropped-image img {
+            position: absolute;
+            clip: rect(14px, 239px, 42px, 0px); /* Values are: top, right, bottom, left */
+        }
+    </style>
+
     <script>
         async function getDataForWorkload() {
             //fetch Story point field
@@ -168,7 +184,7 @@
             }
 
             console.log(userVsVelocity_cur)
-            return { "workload": userVsVelocity_cur, "userVsPts":userVsPts,"users": userDetails, "totalWorkload": totalWorkload };
+            return { "workload": userVsVelocity_cur, "userVsPts": userVsPts, "users": userDetails, "totalWorkload": totalWorkload };
         }
 
         function addRow(id, name, load) {
@@ -187,6 +203,7 @@
 
         async function displayWorkload() {
             var issues = await getDataForWorkload();
+            console.log(issues)
             var userVsWorkload = cleanDataForHistogram(issues);
 
             var workload = userVsWorkload.workload;
@@ -262,6 +279,14 @@
 
             chart.colorScale(customColorScale);
 
+            /*var legend = chart.legend();
+
+            legend.enabled(true);
+            legend.itemsLayout('horizontal');
+            legend.position('bottom');
+            legend.align('center');
+
+            //chart.legend(true);*/
             chart.container("heat_chart_container");
             chart.draw();
         }
@@ -288,8 +313,10 @@
                             <tbody>
                             </tbody>
                         </table> --}}
-                        <div id="heat_chart_container" style="height: 100px;width:500px;"></div>
-
+                        <div id="heat_chart_container" style="height: 100px;width:1000px;"></div>
+                        <div class="cropped-image"><img  src="https://www.color-blindness.com/wp-content/images/deuteranopia-color-spectrum.jpg"/></div>
+                        <div><h4 style="padding-left:17px;">Stress (High to low)</h4></div>
+                        
                         <h3>Workload distribution among team</h3>
                         {{!-- <table id="workload_split" class="aui aui-table">
                             <thead>

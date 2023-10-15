@@ -19,7 +19,7 @@
     "modules": {
         "generalPages": [
             {
-                "key": "hello-world-page-jira",
+                "key": "collab",
                 "location": "system.top.navigation.bar",
                 "name": {
                     "value": "Collaborator network"
@@ -45,7 +45,16 @@
                 "name": {
                     "value": "Workload analyzer"
                 },
-                "key": "my-project-page"
+                "key": "my-project-page-workload"
+            },
+            {
+                "url": "/get-keywords?projectId=${project.id}",
+                "iconUrl": "https://img.icons8.com/?size=96&id=Tsa8RI4Bpje1&format=png",
+                "weight": 100,
+                "name": {
+                    "value": "CategorizePro"
+                },
+                "key": "my-project-page-keyword"
             }
         ]
     }

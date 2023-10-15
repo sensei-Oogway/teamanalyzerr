@@ -1,23 +1,99 @@
-{{!< layout}}
-<header class="aui-page-header">
+{{!< layout}} <header class="aui-page-header">
   <div class="aui-page-header-inner">
-    <div class="aui-page-header-main intro-header">
-      <h1>Hello World!</h1>
+        <div class="aui-page-header-main intro-header">
+            <h2>My Little app - CategorizePro(Dev)</h2>
+        </div>
+  </div>
 
-      <p class="subtitle">Welcome to {{title}}</p>
+  <link rel="stylesheet" href="https://aui-cdn.atlassian.com/aui-adg/6.0.3/css/aui.css">
+  <script src="https://aui-cdn.atlassian.com/aui-adg/6.0.3/js/aui.js"></script>
+
+  <script>
+      /*AJS.toInit(function() {
+      // Get a reference to the slider container
+      var sliderContainer = document.getElementById("slider-container");
+
+      // Create a new AUI slider
+      var slider = new AJS.Slider({
+        element: sliderContainer,
+        max: 100, // Maximum value
+        min: 0,   // Minimum value
+        value: 50 // Initial value
+      });
+
+      // Add an event listener to react to slider changes
+      slider.on("valueChange", function(value) {
+        console.log("Slider value changed to:", value);
+      });
+    });*/
+  </script>
+
+
+  </header>
+
+  <div class="aui-page-panel main-panel">
+    <div class="aui-page-panel-inner">
+      <section class="aui-page-panel-item">
+        <div class="aui-group">
+          <div class="aui-item">
+            <h3 id="count_title">Issues Categories</h3>
+            <div id="slider-container"></div>
+
+            <table id="keywords" class="aui aui-table">
+              <thead>
+                <tr>
+                  <th>Category</th>
+                  <th>Issues</th>
+                </tr>
+              </thead>
+              <tbody>
+              </tbody>
+            </table>
+
+          </div>
+        </div>
+      </section>
     </div>
   </div>
-</header>
 
-<div class="aui-page-panel main-panel">
-  <div class="aui-page-panel-inner">
-    <section class="aui-page-panel-item">
-      <div class="aui-group">
-        <div class="aui-item">
-          
-          </p>
-        </div>
-      </div>
-    </section>
-  </div>
-</div>
+  <script>
+
+  function addRow(id, key, issues) {
+    var table = document.getElementById(id);
+    var newRow = table.tBodies[0].insertRow();
+
+    // Insert cells for the row
+    var cell1 = newRow.insertCell(0);
+    var cell2 = newRow.insertCell(1);
+
+    // Set the cell values
+    cell1.innerHTML = key;
+    content = "";
+
+    console.log(issues);
+
+
+    for (issue in issues){
+      content += issues[issue] + "<br>"
+    }
+
+    cell2.innerHTML = content;
+  }
+
+  function displayMap(data,keyword_count){
+    var keywordVsIssue = data[keyword_count]
+    for(keyword in keywordVsIssue){
+      addRow("keywords",keyword,keywordVsIssue[keyword])
+    }
+
+    document.getElementById("count_title").innerHTML = "Issues Categories - level" + keyword_count
+  }
+
+  var dump = JSON.parse(JSON.stringify({{{ dump }}}));
+  displayMap(dump,1)
+
+  
+
+
+
+</script>
